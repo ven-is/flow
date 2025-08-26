@@ -1,0 +1,55 @@
+services:
+  postgres:
+    # This service is unchanged. Dokploy will pull it from Docker Hub.
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  n8n:
+    # ---- START OF CHANGE ----
+    # Instead of pulling an image, we build it from the Dockerfile
+    # in the current directory ('.').
+    build: .
+    # ---- END OF CHANGE ----
+    
+    restart: unless-stopped
+    environment:
+      # All environment variables remain the same
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=${N8N_PORT}
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://${N8N_HOST}/
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - N8N_SECURE_COOKIE=false
+      - N8N_BINARY_DATA_MODE=disk
+      - N8N_USER_FOLDER_ALLOWLIST=/home/node/.n8n,/output
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - n8n_output_data:/output
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  n8n_data:
+  postgres_data:
+  n8n_output_data: {}
